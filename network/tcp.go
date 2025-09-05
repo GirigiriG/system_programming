@@ -1,6 +1,7 @@
 package network
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"net"
@@ -27,7 +28,6 @@ func New() {
 
 	for {
 		conn, err := listen.Accept()
-		fmt.Println("accepted\n" + conn.RemoteAddr().String())
 		if err != nil {
 			fmt.Println(err)
 			continue
@@ -49,10 +49,17 @@ func handleConnection(conn net.Conn) {
 		conn.Close()
 	}()
 
-	buf := make([]byte, 6)
+	reader := bufio.NewReader(conn)
+	remoteID := ""
+
+	if strings.Contains(remoteAddress, "::") {
+		remoteID = strings.Split(remoteAddress, "]:")[1]
+	} else {
+		remoteID = strings.Split(remoteAddress, ":")[1]
+	}
 
 	for {
-		_, err := conn.Read(buf)
+		msg, err := reader.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
 				fmt.Println("connection closed by client:", remoteAddress)
@@ -62,12 +69,10 @@ func handleConnection(conn net.Conn) {
 			return
 		}
 
-		msg := string(buf)
-
 		mu.Lock()
 		for addr, con := range connections {
 			if addr != remoteAddress {
-				fmt.Fprintf(con, "[%v] %v", strings.Split(addr, "]:")[1], msg)
+				fmt.Fprintf(con, "[%v] %v", remoteID, msg)
 			}
 		}
 		mu.Unlock()

@@ -11,22 +11,36 @@ func main() {
 	port := "9091"
 	conn, err := net.Dial("tcp", "localhost:"+port)
 	if err != nil {
-		fmt.Println("unable to connect to localhost:"+port, err)
+		fmt.Println("ECONNREFUSED to localhost:"+port, err)
+		os.Exit(111)
 	}
-
 	defer conn.Close()
-	buf := make([]byte, 1024)
+
+	go func() {
+		// buf := make([]byte, 1024)
+		reader := bufio.NewReader(conn)
+		for {
+			msg, err := reader.ReadString('\n') // or some delimiter
+
+			if err != nil {
+				fmt.Println("connection closed by server")
+				os.Exit(1)
+				return // don't exit, just stop goroutine
+			}
+
+			fmt.Print(msg)
+		}
+	}()
+
+	stdinScanner := bufio.NewScanner(os.Stdin)
 
 	for {
-		n, err := conn.Read(buf)
-		if err != nil {
-			fmt.Println("connection closed by server", err)
-			os.Exit(0)
-			break
+		fmt.Println("enter message: ")
+		if stdinScanner.Scan() {
+			msg := stdinScanner.Text()
+			if _, err := conn.Write([]byte(msg+"\n")); err != nil {
+				fmt.Println("Error writing to server:", err)
+			}
 		}
-
-		fmt.Println(string(buf[:n]))
 	}
-
-	bufio.NewReader(os.Stdin).ReadBytes('\n')
 }
